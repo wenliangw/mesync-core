@@ -1,0 +1,318 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import type { HostContext } from '../src/host.js'
+import { readState } from '../src/state.js'
+import { findTool, TOOLS } from '../src/tools.js'
+
+interface Harness extends HostContext {
+  run(name: string, args?: Record<string, unknown>): Promise<string>
+}
+
+/** core 的工具是普通函数：给 root + cwd 就能调，不需要模拟任何平台对象。 */
+function harness(): Harness {
+  const root = mkdtempSync(join(tmpdir(), 'mesync-core-'))
+  const cwd = mkdtempSync(join(tmpdir(), 'mesync-ws-'))
+  const host: HostContext = { root, cwd }
+  return {
+    ...host,
+    async run(name, args = {}) {
+      const tool = findTool(name)
+      if (!tool) throw new Error(`没有工具 ${name}`)
+      return tool.run(args, host)
+    },
+  }
+}
+
+/** 写记忆前先把场景定下来（链上 M0/M1 的产物）。 */
+async function inCode(h: Harness, name: string, args: Record<string, unknown> = {}) {
+  if (!readState(h.root).scenario) await h.run('scenario_load', { scenario: 'code' })
+  return h.run(name, args)
+}
+
+describe('工具面', () => {
+  it('八个工具，名字稳定', () => {
+    expect(TOOLS.map((tool) => tool.name).sort()).toEqual([
+      'doc_write',
+      'memory_discard',
+      'memory_read',
+      'memory_search',
+      'memory_write',
+      'mesync_context',
+      'path_record',
+      'scenario_load',
+    ])
+  })
+
+  it('参数是纯 JSON Schema（对象根 + required 数组）', () => {
+    for (const tool of TOOLS) {
+      expect(tool.parameters.type, tool.name).toBe('object')
+      expect(typeof tool.parameters.properties, tool.name).toBe('object')
+      if (tool.parameters.required) {
+        for (const key of tool.parameters.required) {
+          expect(Object.keys(tool.parameters.properties), tool.name).toContain(key)
+        }
+      }
+    }
+  })
+
+  it('必需参数都标在 required 里', () => {
+    const required = Object.fromEntries(
+      TOOLS.map((tool) => [tool.name, tool.parameters.required ?? []]),
+    )
+    expect(required.scenario_load).toEqual(['scenario'])
+    expect(required.memory_write).toEqual(['kind', 'title', 'content'])
+    expect(required.memory_read).toEqual(['path'])
+    expect(required.doc_write).toEqual(['path', 'content'])
+    expect(required.memory_discard).toEqual(['path'])
+    expect(required.path_record).toEqual(['line'])
+  })
+})
+
+describe('mesync_context', () => {
+  it('列出场景并给出下一步', async () => {
+    const h = harness()
+    const text = await h.run('mesync_context')
+    expect(text).toContain('## 场景')
+    expect(text).toContain('code（代码开发）')
+    expect(text).toContain('## 下一步')
+    expect(text).toContain('还没有任何产物')
+  })
+})
+
+describe('scenario_load', () => {
+  it('交付场景卡、AGENT.md、两层位置', async () => {
+    const h = harness()
+    const text = await h.run('scenario_load', { scenario: 'code' })
+    expect(text).toContain('## 场景 code')
+    expect(text).toContain('验收：')
+    expect(text).toContain('## 场景层工作说明')
+    expect(text).toContain('## 场景层硬规则')
+    expect(text).toContain('## 两层的位置')
+    expect(text).toContain('scope=scenario')
+    expect(text).toContain('chain-judge.md')
+  })
+
+  it('把场景记进运行期状态', async () => {
+    const h = harness()
+    await h.run('scenario_load', { scenario: 'code' })
+    expect(readState(h.root).scenario).toBe('code')
+  })
+
+  it('未知场景报错并给出可用清单', async () => {
+    const h = harness()
+    await expect(h.run('scenario_load', { scenario: 'nope' })).rejects.toThrow(/可用场景/)
+  })
+
+  it('读得到该层已写的硬规则', async () => {
+    const h = harness()
+    const dir = join(h.root, 'scenarios', 'code')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'rules.md'), '- 出稿前 grep 组件库版本\n', 'utf8')
+
+    const text = await h.run('scenario_load', { scenario: 'code' })
+    expect(text).toContain('grep 组件库版本')
+  })
+
+  it('平台可以把自己的写入说明塞进来', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'mesync-core-'))
+    const cwd = mkdtempSync(join(tmpdir(), 'mesync-ws-'))
+    const tool = findTool('scenario_load')!
+    const text = await tool.run(
+      { scenario: 'code' },
+      { root, cwd, writeNotice: '- 这个平台的数据根在你的文件工具之外。' },
+    )
+    expect(text).toContain('这个平台的数据根在你的文件工具之外')
+  })
+})
+
+describe('memory_write', () => {
+  it('写项目级记录', async () => {
+    const h = harness()
+    const out = await inCode(h, 'memory_write', {
+      kind: 'cognition',
+      title: '检索是子串匹配',
+      content: 'search.ts 用 includes，不是语义检索。',
+    })
+    expect(out).toContain('✅')
+
+    const file = join(
+      h.root,
+      'scenarios',
+      'code',
+      'features',
+      readState(h.root).project!,
+      'records',
+      'cognition',
+      '检索是子串匹配.md',
+    )
+    expect(existsSync(file)).toBe(true)
+    expect(readFileSync(file, 'utf8')).toContain('kind: cognition')
+  })
+
+  it('写场景级记录时不带项目字段', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', {
+      kind: 'taste',
+      title: '不喜欢纯黑背景',
+      content: '用深灰。',
+      scope: 'scenario',
+    })
+    const text = readFileSync(join(h.root, 'scenarios', 'code', 'records', 'taste', '不喜欢纯黑背景.md'), 'utf8')
+    expect(text).toContain('scope: scenario')
+    expect(text).not.toContain('project:')
+  })
+
+  it('pending 落进临时区，不进正式记录', async () => {
+    const h = harness()
+    const out = await inCode(h, 'memory_write', {
+      kind: 'pending',
+      title: '优先 v3.2',
+      content: '优先 3.2，缺的组件用 3.1 兜底。',
+    })
+    expect(out).toContain('临时区')
+    expect(existsSync(join(h.root, '_pending', '优先-v3.2.md'))).toBe(true)
+  })
+
+  it('空标题报错', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', { kind: 'cognition', title: 't', content: 'x' })
+    await expect(h.run('memory_write', { kind: 'cognition', title: '  ', content: 'x' })).rejects.toThrow(
+      /title/,
+    )
+  })
+
+  it('未知 kind 报错', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', { kind: 'cognition', title: 't', content: 'x' })
+    await expect(h.run('memory_write', { kind: 'nope', title: 't', content: 'x' })).rejects.toThrow(/kind/)
+  })
+
+  it('同标题不覆盖，换一个 slug', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', { kind: 'cognition', title: '同名', content: '第一版' })
+    await h.run('memory_write', { kind: 'cognition', title: '同名', content: '第二版' })
+    const dir = join(h.root, 'scenarios', 'code', 'features', readState(h.root).project!, 'records', 'cognition')
+    expect(existsSync(join(dir, '同名.md'))).toBe(true)
+    expect(existsSync(join(dir, '同名-2.md'))).toBe(true)
+  })
+})
+
+describe('memory_search', () => {
+  it('命中关键词并给出相对路径', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', {
+      kind: 'decision',
+      title: '用子串匹配',
+      content: '不建索引，避免副本。',
+    })
+    const text = await h.run('memory_search', { query: '索引' })
+    expect(text).toContain('用子串匹配')
+    expect(text).toContain('records/decision/')
+  })
+
+  it('场景级与项目级都能搜到', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', { kind: 'taste', title: '跨项目偏好', content: '都用 pnpm', scope: 'scenario' })
+    await h.run('memory_write', { kind: 'taste', title: '本项目偏好', content: '带 --filter' })
+
+    const all = await h.run('memory_search', { query: '偏好' })
+    expect(all).toContain('跨项目偏好')
+    expect(all).toContain('本项目偏好')
+    expect(all).toContain('（场景级）')
+  })
+
+  it('没有命中时如实说没有', async () => {
+    const h = harness()
+    expect(await h.run('memory_search', { query: '不存在的词' })).toContain('没有命中')
+  })
+})
+
+describe('memory_read', () => {
+  it('读得到 meta 心法', async () => {
+    const h = harness()
+    expect(await h.run('memory_read', { path: 'meta/decision.md' })).toContain('决策')
+  })
+
+  it('读得到 chain-judge', async () => {
+    const h = harness()
+    expect(await h.run('memory_read', { path: 'chain-judge.md' })).toContain('Q1')
+  })
+
+  it('拒绝越界路径', async () => {
+    const h = harness()
+    await expect(h.run('memory_read', { path: '../../etc/passwd' })).rejects.toThrow(/越界/)
+  })
+
+  it('找不到时报错', async () => {
+    const h = harness()
+    await expect(h.run('memory_read', { path: 'meta/nope.md' })).rejects.toThrow(/找不到/)
+  })
+})
+
+describe('doc_write', () => {
+  it('写入该层 rules.md，之后 scenario_load 能读到', async () => {
+    const h = harness()
+    await h.run('doc_write', {
+      path: 'scenarios/code/rules.md',
+      content: '- 出稿前 grep 组件库版本\n  来源：records/decision/组件版本.md\n',
+    })
+    expect(await h.run('scenario_load', { scenario: 'code' })).toContain('grep 组件库版本')
+  })
+
+  it('拒绝越界路径', async () => {
+    const h = harness()
+    await expect(h.run('doc_write', { path: '../x.md', content: 'x' })).rejects.toThrow(/越界/)
+  })
+})
+
+describe('memory_discard', () => {
+  it('删掉临时答案', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', { kind: 'pending', title: '待验证', content: 'x' })
+    expect(existsSync(join(h.root, '_pending', '待验证.md'))).toBe(true)
+
+    expect(await h.run('memory_discard', { path: '_pending/待验证.md' })).toContain('已删除')
+    expect(existsSync(join(h.root, '_pending', '待验证.md'))).toBe(false)
+  })
+})
+
+describe('path_record', () => {
+  it('追加一行走过的路径', async () => {
+    const h = harness()
+    await h.run('scenario_load', { scenario: 'code' })
+    await h.run('path_record', { line: 'M0!→M1!→M2!→M3!→M4!→K! 记了一条认知' })
+    expect(readFileSync(join(h.root, '_paths', `code-${readState(h.root).project}.md`), 'utf8')).toContain(
+      'M0!→M1!→M2!→M3!→M4!→K!',
+    )
+  })
+})
+
+describe('路径安全', () => {
+  it('场景 id 不能带 ../', async () => {
+    const h = harness()
+    await expect(h.run('scenario_load', { scenario: '../../etc' })).rejects.toThrow(/不合法/)
+  })
+
+  it('project 不能跳到数据根外', async () => {
+    const h = harness()
+    await inCode(h, 'memory_write', { kind: 'cognition', title: 't', content: 'x' })
+    await expect(
+      h.run('memory_write', { kind: 'cognition', title: 't2', content: 'x', project: '../../escape' }),
+    ).rejects.toThrow(/不合法/)
+  })
+
+  it('正常 id 不被误伤', async () => {
+    const h = harness()
+    const out = await inCode(h, 'memory_write', {
+      kind: 'cognition',
+      title: 't',
+      content: 'x',
+      scenario: 'code',
+      project: 'owner-repo.v2',
+    })
+    expect(out).toContain('✅')
+  })
+})

@@ -1,0 +1,42 @@
+{
+  "name": "mesync-core",
+  "version": "0.1.0",
+  "description": "同频记忆引擎的内核：判断链 + 五块心法 + 存储模型（平台无关）",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/templates/**/*.md",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc -b && node scripts/copy-assets.mjs",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf lib"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.9"
+  },
+  "keywords": [
+    "memory",
+    "agent",
+    "methodology",
+    "llm"
+  ],
+  "license": "MIT"
+}
