@@ -3,6 +3,7 @@
 M0 这次要的是「产出」还是「回答」？
    回答 → 直接答 → M4
    产出 → 判断场景（看产出，不看输入）→ scenario_load → M1
+          判不准就 mesync_context 看场景清单
 
 M1 动手前先拿两样：该层 rules.md 的硬规则与工具清单（scenario_load 会一并给你）；
    memory_search 找到的相关记录。两样都没有就直接进 M2，不要空转。
@@ -16,7 +17,7 @@ M3 用户评价？
 
 M4 这次留下了什么？
    有取舍 → 决策    有事实 → 认知    被认可的做法 → 品味    有代价的错 → 纠错
-   判断分支读 chain-judge.md；写法读 meta/<kind>.md；想不清就不记。
+   判断分支 memory_read chain-judge.md；写法读 meta/<kind>.md；想不清就不记。
    落在哪层：内容里出现项目名 → 项目级；不出现 → 场景级。
    违反不可逆、或会反复执行的约束 → 用 doc_write 写进该层 rules.md，不只写成记录。
 

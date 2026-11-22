@@ -35,10 +35,12 @@ TL 工具  → 读 meta/tool.md        写：做什么 / 何时用 / 怎么调 /
 记录（五块）  → memory_write(kind, title, content, scope)
 硬规则/AGENT  → doc_write(path, content)
 临时答案      → memory_write(kind: "pending")
+                 升格：产物被认可 → 按五块写正式记录 → memory_discard 删掉临时
+                 丢弃：被否定 → memory_discard 直接删，不留痕
 走过的路径    → path_record(line)
 ```
 
-**数据根在 workspace 之外**，你自己的文件工具写不进去——必须走这几个工具。
+**数据根可能不在你自己的文件工具能到达的范围**，一律走这几个工具，不要自己找路径写。
 
 ## 落在哪一层
 
