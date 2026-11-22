@@ -39,7 +39,7 @@ templates/
     code/  design/  prd/
       scenario.md      场景卡：判据 / 产出 / 验收
       AGENT.md         场景层工作说明
-docs/                  设计文档（架构、链、判断、五块心法）
+docs/                  设计文档（架构、链、判断、五块心法、未决设计）
 ```
 
 ### 判断链
