@@ -1,6 +1,6 @@
 // 内容守卫：这几份 md 是接入方唯一依赖的东西，缺一份整条链就断。
 //
-// 零依赖，用 node 自带的测试跑：npm test
+// 零依赖，用 node 自带的测试跑：npm test（连同 vitest 那套一起）
 // 这里只检查「文件在、非空、链引用的路径都存在」——内容怎么写归心法管，
 // 测试不做文字审查。
 
@@ -80,9 +80,14 @@ test('不出现别的代的工具名', () => {
   }
 })
 
-test('包是纯内容：没有可执行代码', () => {
+test('包是内容 + 机制：md 导出齐全，没有 bin 与运行期依赖', () => {
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-  assert.equal(pkg.bin, undefined, '内容包不该有 bin')
-  assert.equal(pkg.main, undefined, '内容包不该有 main')
-  assert.equal(pkg.dependencies, undefined, '内容包不该有依赖')
+  assert.equal(pkg.bin, undefined, '不该有 bin')
+  assert.equal(pkg.dependencies, undefined, '不该有运行期依赖')
+
+  // 机制入口与内容入口并存：机制编译到 lib/，md 仍是接入方直接读的那一份。
+  assert.match(pkg.exports['.'].default, /^\.\/lib\/[^/]+\.js$/, '机制入口应指向编译产物')
+  for (const key of ['./use.md', './chain-judge.md', './chain-rules.md', './meta/*.md']) {
+    assert.ok(pkg.exports[key], `md 导出缺 ${key}`)
+  }
 })

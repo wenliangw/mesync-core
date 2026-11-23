@@ -1,9 +1,14 @@
 {
   "name": "mesync-core",
   "version": "0.1.0",
-  "description": "同频记忆引擎的心法内核：纯 Markdown 的判断链与五块心法（无代码）",
+  "description": "同频记忆引擎的内核：Markdown 判断链与五块心法，外加平台无关的运行时机制（存储、检索、常驻正文、工具语义）",
   "license": "MIT",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
   "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
     "templates/**/*.md",
     "docs/**/*.md",
     "README.md",
@@ -11,6 +16,10 @@
     "LICENSE"
   ],
   "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
     "./package.json": "./package.json",
     "./templates/*": "./templates/*",
     "./use.md": "./templates/mesync-use.md",
@@ -22,7 +31,14 @@
     "./docs/*": "./docs/*"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs && vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.9"
   },
   "keywords": [
     "memory",
