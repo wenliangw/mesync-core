@@ -7,8 +7,7 @@
 
 import { join } from 'node:path'
 
-import { assetFile } from './assets.js'
-import { readText } from './fs.js'
+import { readOverride } from './assets.js'
 
 /** 五块心法的名字。顺序与判断链的叶子一致。 */
 export const META_NAMES = ['cognition', 'decision', 'taste', 'correction', 'tool'] as const
@@ -18,22 +17,17 @@ export type MetaName = (typeof META_NAMES)[number]
 /** 按需读的链文件。 */
 export const CHAIN_DOCS = ['chain-judge.md', 'chain-rules.md'] as const
 
-/** 数据根里的覆盖文件优先，其次预置。 */
-function readWithOverride(root: string, relative: string): string | null {
-  return readText(join(root, relative)) ?? readText(assetFile(relative))
-}
-
 /** 读一份心法正文。 */
 export function readMeta(root: string, name: MetaName): string | null {
-  return readWithOverride(root, join('meta', `${name}.md`))
+  return readOverride(root, join('meta', `${name}.md`))
 }
 
 /** 读常驻注入正文（mesync-use）。 */
 export function readUseDoc(root: string): string | null {
-  return readWithOverride(root, 'mesync-use.md')
+  return readOverride(root, 'mesync-use.md')
 }
 
 /** 读链的按需部分（chain-judge / chain-rules）。 */
 export function readChainDoc(root: string, name: (typeof CHAIN_DOCS)[number]): string | null {
-  return readWithOverride(root, name)
+  return readOverride(root, name)
 }

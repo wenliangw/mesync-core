@@ -248,6 +248,17 @@ describe('memory_read', () => {
     await expect(h.run('memory_read', { path: '../../etc/passwd' })).rejects.toThrow(/越界/)
   })
 
+  // 覆盖优先于内置：数据根有就用数据根的，没有才回落到包里。
+  // 「回落」方向已有测试（空数据根能读到 meta/decision.md），这里补相反的方向。
+  it('数据根的同名文件覆盖包内模板', async () => {
+    const h = harness()
+    mkdirSync(join(h.root, 'meta'), { recursive: true })
+    writeFileSync(join(h.root, 'meta', 'decision.md'), '# 我改过的决策写法\n', 'utf8')
+
+    const text = await h.run('memory_read', { path: 'meta/decision.md' })
+    expect(text.trim()).toBe('# 我改过的决策写法')
+  })
+
   it('找不到时报错', async () => {
     const h = harness()
     await expect(h.run('memory_read', { path: 'meta/nope.md' })).rejects.toThrow(/找不到/)

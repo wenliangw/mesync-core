@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -38,6 +38,19 @@ describe('常驻正文', () => {
     const { text, dropped } = residentText({ root: root(), cwd: '/tmp/ws', project: 'demo', limit: 300 })
     expect(dropped.length).toBeGreaterThan(0)
     expect(text.length).toBeLessThanOrEqual(300)
+  })
+
+  // 心法是「开放式」的：用户在数据根放一份同名文件，就会盖掉内置那份。
+  //
+  // 这条守卫还有第二个用途：hook 注入是**每次现算**的，一旦有人为了性能把文本
+  // 缓存住，这条测试会先红——缓存会让「改文件就改行为」这个性质消失。
+  it('用户覆盖 mesync-use.md 后，注入用的是他的版本', () => {
+    const dir = root()
+    writeFileSync(join(dir, 'mesync-use.md'), '## 我自己的链\n\nM0 先问这轮要不要动手。\n', 'utf8')
+
+    const { text } = residentText({ root: dir, cwd: '/tmp/ws', project: 'demo' })
+    expect(text).toContain('我自己的链')
+    expect(text).not.toContain('M4 这次留下了什么')
   })
 
   it('正常体量不丢任何一段', () => {
