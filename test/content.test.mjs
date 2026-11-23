@@ -80,9 +80,11 @@ test('不出现别的代的工具名', () => {
   }
 })
 
-test('包是内容 + 机制：md 导出齐全，没有 bin 与运行期依赖', () => {
+test('包形状：md 导出、机制入口、命令入口都在，且没有运行期依赖', () => {
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-  assert.equal(pkg.bin, undefined, '不该有 bin')
+
+  // 零依赖是刻意的：core 只绑 Node 内置模块。接一个 SDK 就会把「能不能离线跑」
+  // 绑到别人的发布节奏上，而那正是这个包想避免的。
   assert.equal(pkg.dependencies, undefined, '不该有运行期依赖')
 
   // 机制入口与内容入口并存：机制编译到 lib/，md 仍是接入方直接读的那一份。
@@ -90,4 +92,9 @@ test('包是内容 + 机制：md 导出齐全，没有 bin 与运行期依赖', 
   for (const key of ['./use.md', './chain-judge.md', './chain-rules.md', './meta/*.md']) {
     assert.ok(pkg.exports[key], `md 导出缺 ${key}`)
   }
+
+  // 命令入口：没有插件 API 的框架靠它接进来（hook 形态 / MCP 形态）。
+  // 声明了就得真的在包里，否则 `npm i` 之后 mesync 命令指向一个不存在的文件。
+  assert.ok(pkg.bin?.mesync, '应声明 mesync 命令')
+  assert.ok(existsSync(join(root, pkg.bin.mesync)), `bin 指向的文件不存在：${pkg.bin.mesync}`)
 })

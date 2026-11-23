@@ -9,6 +9,7 @@
   "files": [
     "lib/**/*.js",
     "lib/**/*.d.ts",
+    "bin/**/*.mjs",
     "templates/**/*.md",
     "docs/**/*.md",
     "README.md",
@@ -33,6 +34,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "pretest": "npm run build",
     "test": "node --test test/*.test.mjs && vitest run",
     "prepublishOnly": "npm run build"
   },
@@ -47,5 +49,8 @@
     "methodology",
     "prompt",
     "markdown"
-  ]
+  ],
+  "bin": {
+    "mesync": "./bin/mesync.mjs"
+  }
 }

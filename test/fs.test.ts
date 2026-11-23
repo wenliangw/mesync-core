@@ -1,9 +1,9 @@
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-import { appendBlock, frontList, frontString, listFilesDeep, parseFront, readText, writeText } from '../src/fs.js'
+import { appendBlock, ensureDir, frontList, frontString, listFilesDeep, parseFront, readText, writeText } from '../src/fs.js'
 
 function tempRoot(): string {
   return mkdtempSync(join(tmpdir(), 'mesync-fs-'))
@@ -47,6 +47,28 @@ describe('parseFront', () => {
     const front = parseFront(['---', 'id: x', '---', ''].join('\n'))
     expect(frontString(front, 'missing')).toBe('')
     expect(frontList(front, 'missing')).toEqual([])
+  })
+})
+
+// 数据根不可写是**真实会发生的**（容器里 UID 不对、只读挂载、公司机器的权限策略）。
+// 这种情况报原始 errno，Agent 只会拿同样的参数重试一遍然后放弃。
+describe('ensureDir', () => {
+  it('不可写时给的是能照着做的话', () => {
+    if (typeof process.getuid === 'function' && process.getuid() === 0) return // root 不看权限位
+
+    const dir = mkdtempSync(join(tmpdir(), 'mesync-ro-'))
+    chmodSync(dir, 0o500)
+    try {
+      expect(() => ensureDir(join(dir, 'sub'))).toThrow(/数据根不可写/)
+    } finally {
+      chmodSync(dir, 0o700)
+    }
+  })
+
+  it('别的错原样抛出，不瞎套话', () => {
+    // /dev/null 是个文件，在它下面建目录是 ENOTDIR——不属于「数据根不可写」
+    expect(() => ensureDir('/dev/null/nope')).toThrow()
+    expect(() => ensureDir('/dev/null/nope')).not.toThrow(/数据根不可写/)
   })
 })
 

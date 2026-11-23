@@ -65,6 +65,79 @@ M5 记下走过的路径
 
 ---
 
+## 三种接法，选一种
+
+| 你的框架有什么 | 适配层要写的东西 |
+|---|---|
+| hook + MCP | **一份配置，零代码** |
+| 插件 API | 三四十行：把 `TOOLS` 注册成工具、把 `residentText()` 送进提示（dsh 是这样，176 行） |
+| 只能读写文件 | 直接读 `templates/` 里的 md，八个工具自己实现 |
+
+### 接法一：只写配置
+
+包自带一个 `mesync` 命令，两个子命令正好对应两件事：
+
+```bash
+mesync hook SessionStart     # 读 stdin 的 hook JSON → 往 stdout 写 additionalContext
+mesync mcp                   # MCP stdio 服务，暴露八个工具
+```
+
+**hook 只在「上下文可能是空的」时刻注入**：`SessionStart`、`PostCompact`、
+`resume`、`clear`、`compact`。事件名的大小写与分隔符**三种写法都认**
+（`SessionStart` / `session_start` / `session-start`）——各框架写法本来就不一致
+（hooks 配置用 snake_case、命令行传参用 kebab、事件通知用 camelCase），
+而配错一个字母的后果是**静默不注入**，这是最难查的一类故障。
+
+**刻意不接 `UserPromptSubmit`**：每次发话都送会吃掉上下文预算，而且需要猜
+「这条消息是不是新任务」——那个判断属于 Agent，不属于 hook。
+
+实测注入体积 **1145 字符**（中文约 1 字符 1 token），而 Codex 的
+`additionalContext` 上限约 2500 token，留了一半余量。
+
+MCP 那边是**有状态**的：场景记在数据根里，不是记在进程内存里，所以 server
+重启不丢，同一个根上的多次调用共享同一个场景。
+
+codex 的接法（事件键名以你那版 codex 的 hooks 文档为准）：
+
+```jsonc
+// .codex/hooks.json
+{
+  "session_start": [
+    { "hooks": [{ "type": "command", "command": "mesync hook SessionStart" }] }
+  ],
+  "post_compact": [
+    { "hooks": [{ "type": "command", "command": "mesync hook PostCompact" }] }
+  ]
+}
+```
+
+MCP server：
+
+```toml
+# ~/.codex/config.toml
+[mcp_servers.mesync]
+command = "mesync"
+args = ["mcp"]
+```
+
+想让某个框架沿用老目录、或者**和另一个框架共用同一套记忆**：
+
+```bash
+mesync hook SessionStart --dir-name .dsh-mesync
+mesync mcp --dir-name .dsh-mesync
+```
+
+三条纪律（跟接法无关，都成立）：
+
+1. **hook 必须永远退出 0。** 非零退出会让框架把 hook 当成故障，用户看到的是
+   「会话卡住了」，而我们只是没注入一段提示词。所以任何异常都被吞掉。
+2. **不要缓存注入文本。** 每次现算，改数据根里的 md 就立刻改变行为；缓存会让
+   这个性质消失。
+3. **stdout 只能说协议。** hook 的 stdout 会被整段收进上下文（连空行也是），
+   MCP 的 stdout 只能是 JSON-RPC。日志一律走 stderr。
+
+---
+
 ## 接入方要做什么
 
 ### 1. 读文件的两种方式

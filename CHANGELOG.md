@@ -27,6 +27,36 @@
 - 适配层要自己的目录名就传 `dirName`（dsh 传 `'.dsh-mesync'`，老用户零迁移）
 - `scenarioLines` 的兜底提示不再写死路径，改用真实数据根——用户把根配到别处时，写死的提示会把人指到不存在的目录
 
+### 新增命令行入口：`mesync hook` 与 `mesync mcp`
+
+机制搬进来之后，剩下的问题是「别的框架怎么拿到它」。很多框架根本没有插件机制，
+只有 hook 配置和 MCP server 配置。所以补一个命令入口，让那类框架的适配层退化成
+**一份配置**：
+
+```bash
+mesync hook <event>   # 读 stdin 的 hook JSON → 往 stdout 写 additionalContext
+mesync mcp            # MCP stdio 服务，八个工具按标准协议暴露
+```
+
+- `src/hook.ts`：判断「这个事件该不该注入」。注入时机是**上下文可能为空**的时刻
+  （SessionStart / PostCompact / resume / clear / compact），**不含 UserPromptSubmit**
+  ——每轮都送会吃预算，且「是不是新任务」这个判断属于 Agent。事件名归一化后接受
+  camelCase / snake_case / kebab 三种写法，因为各框架确实不一致，配错一个字母的
+  后果是静默不注入。
+- `src/mcp.ts`：手写 JSON-RPC（initialize / ping / tools/list / tools/call），
+  不引官方 SDK——core 是零运行期依赖的，接一个 SDK 会把「能不能离线跑」绑到别人的
+  发布节奏上。工具参数本来就是对象根 JSON Schema，与 MCP 的 `inputSchema` 同形，
+  **不需要翻译**。
+- `bin/mesync.mjs`：参数解析、stdin/stdout 接线。hook 分支吞掉所有异常并退出 0
+  ——非零退出会让框架把 hook 当成故障，用户看到的是「会话卡住了」。
+
+工具执行失败（越界、找不到文件）走 MCP 的 `isError`，**不用** JSON-RPC error：
+协议层没错，是工具执行失败，包成协议错会让框架以为连接坏了。
+
+测试：`hook` 9 项 + `mcp` 13 项 + 命令入口 10 项（真起子进程，验参数、stdin、
+stdout、退出码）。`pretest` 会先构建，所以 CLI 测试测的是**构建产物**，
+顺带补上了「tsc 过了不等于 lib 能跑」这个空白。
+
 ### 搬迁原则
 
 判据：**一条代码放哪，只看它需不需要知道「框架叫什么」。** 不需要 → 这里；需要 → 适配层。

@@ -17,8 +17,26 @@ import { randomBytes } from 'node:crypto'
 import { dirname, join } from 'node:path'
 
 /** 递归创建目录。 */
+/**
+ * 建目录。
+ *
+ * 失败时给的是**能照着做**的话，不是 Node 的原始错误。数据根不可写时，
+ * Agent 看到 `EACCES: permission denied, mkdir '...'` 是死路——它既不知道该换根、
+ * 也不知道该提权，通常会retry 同一个调用然后放弃。
+ */
 export function ensureDir(dir: string): void {
-  mkdirSync(dir, { recursive: true })
+  try {
+    mkdirSync(dir, { recursive: true })
+  } catch (failure) {
+    const code = (failure as NodeJS.ErrnoException).code ?? ''
+    if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+      throw new Error(
+        `数据根不可写：${dir}\n` +
+          '换一个位置：命令行的 --root <路径>，或环境变量 MESYNC_ROOT。',
+      )
+    }
+    throw failure
+  }
 }
 
 /** 读文本；不存在或读失败都返回 null（调用方不含异常分支）。 */
