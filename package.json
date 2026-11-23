@@ -1,6 +1,6 @@
 {
   "name": "mesync-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "同频记忆引擎的内核：Markdown 判断链与五块心法，外加平台无关的运行时机制（存储、检索、常驻正文、工具语义）",
   "license": "MIT",
   "type": "module",
