@@ -99,9 +99,9 @@ export function readScenario(root: string, id: string): ScenarioDetail | null {
  * 生成注入用的场景清单。
  * 只给「名称 + 描述 + 判断语义 + 产出」，正文一律不进注入。
  */
-export function scenarioLines(cards: ScenarioCard[]): string[] {
+export function scenarioLines(cards: ScenarioCard[], root: string): string[] {
   if (cards.length === 0) {
-    return ['- 没有可用的场景：先在 ~/.dsh-mesync/scenarios/ 下建一个场景目录。']
+    return [`- 没有可用的场景：先在 ${join(root, 'scenarios')}/ 下建一个场景目录。`]
   }
   return cards.map((card) => {
     const when = card.when.length > 0 ? `；判据 ${card.when.join(' / ')}` : ''

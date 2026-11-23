@@ -19,11 +19,20 @@ describe('sanitizeId', () => {
 
 describe('resolveRoot', () => {
   it('显式配置优先', () => {
-    expect(resolveRoot('/tmp/custom-root')).toBe('/tmp/custom-root')
+    expect(resolveRoot({ configured: '/tmp/custom-root' })).toBe('/tmp/custom-root')
   })
 
-  it('缺省落在 ~/.dsh-mesync（用户级：记忆跟人走）', () => {
-    expect(resolveRoot('')).toBe(join(homedir(), '.dsh-mesync'))
+  it('缺省落在 ~/.mesync（用户级：记忆跟人走；不含任何框架名）', () => {
+    expect(resolveRoot({ configured: '' })).toBe(join(homedir(), '.mesync'))
+  })
+
+  // 适配层要用自己的目录名时传 dirName——dsh 就是靠这个沿用老用户的 ~/.dsh-mesync。
+  it('适配层可以换目录名', () => {
+    expect(resolveRoot({ dirName: '.dsh-mesync' })).toBe(join(homedir(), '.dsh-mesync'))
+  })
+
+  it('坏值不生效，回落默认', () => {
+    expect(resolveRoot({ dirName: '   ' })).toBe(join(homedir(), '.mesync'))
   })
 })
 

@@ -86,7 +86,8 @@ describe('readScenario', () => {
 
 describe('scenarioLines', () => {
   it('清单行带名称、描述、判据与产出', () => {
-    const lines = scenarioLines(listScenarios(tempRoot())).join('\n')
+    const root = tempRoot()
+    const lines = scenarioLines(listScenarios(root), root).join('\n')
     expect(lines).toContain('code（代码开发）')
     expect(lines).toContain('产出 可运行')
     expect(lines).toContain('判据')
@@ -94,6 +95,12 @@ describe('scenarioLines', () => {
 
   it('没有场景时给出去哪建卡的提示', () => {
     // 用不存在任何场景的假根（assets 里始终有预置场景，这里只验兜底文案本身）
-    expect(scenarioLines([])[0]).toContain('scenarios')
+    expect(scenarioLines([], tempRoot())[0]).toContain('scenarios')
+  })
+
+  // 提示里必须是**真实**数据根。写死某个路径的话，用户把根配置到别处时，
+  // 这行提示会把人指到一个不存在的目录——比没有提示更糟。
+  it('提示用的是真实数据根，不是写死的路径', () => {
+    expect(scenarioLines([], '/tmp/my-root')[0]).toContain('/tmp/my-root/scenarios')
   })
 })

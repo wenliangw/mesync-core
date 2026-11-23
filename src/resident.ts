@@ -74,7 +74,7 @@ export function residentText(input: ResidentInput): ResidentResult {
   const coverageLines = formatCoverage(coverageAll(root))
 
   const header = '<!-- mesync:contract -->'
-  const scenarioBlock = ['## 场景（按产出判断，判出后调 scenario_load）', '', ...scenarioLines(cards)]
+  const scenarioBlock = ['## 场景（按产出判断，判出后调 scenario_load）', '', ...scenarioLines(cards, root)]
   const stateBlock = stateLines.length > 0 ? ['', '## 当前状态', '', ...stateLines] : []
   const coverageBlock = ['', '## 记忆覆盖度（最近有哪些产物）', '', ...coverageLines]
 

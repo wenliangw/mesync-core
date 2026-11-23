@@ -17,6 +17,16 @@
 - `src/`（14 个模块，约 1700 行）从 `dsh-mesync` 原样搬入：`host` 接缝定义、`paths` 布局、`fs`/`memory` 读写、`search` 查找、`coverage` 覆盖度、`scenario` 场景卡、`state` 运行期状态、`meta` 心法解析、`resident` 注入文本拼装、`tools` 八个工具、`assets` 模板定位、`types`、以及库入口 `index.ts`。
 - `assets.ts` 的模板定位从 `createRequire('mesync-core/package.json')` 改为基于 `import.meta.url` 找包根——它现在在包内部，不需要再「从外面看进来」。
 
+### 数据根改为可配置
+
+`resolveRoot` 从 `resolveRoot(configured?: string)` 变成 `resolveRoot({ configured?, dirName? })`。
+
+原先缺省值是写死的 `~/.dsh-mesync`——core 里带着一个框架的名字。现在：
+
+- 缺省值改成产品名 `~/.mesync`，core 不再替任何框架做决定
+- 适配层要自己的目录名就传 `dirName`（dsh 传 `'.dsh-mesync'`，老用户零迁移）
+- `scenarioLines` 的兜底提示不再写死路径，改用真实数据根——用户把根配到别处时，写死的提示会把人指到不存在的目录
+
 ### 搬迁原则
 
 判据：**一条代码放哪，只看它需不需要知道「框架叫什么」。** 不需要 → 这里；需要 → 适配层。

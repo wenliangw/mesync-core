@@ -141,7 +141,7 @@ export const TOOLS: readonly ToolSpec[] = [
       const coverage = formatCoverage(coverageAll(root, only || undefined))
 
       const parts = ['## 场景（按产出判断，判出后调 scenario_load）', '']
-      parts.push(...scenarioLines(cards))
+      parts.push(...scenarioLines(cards, root))
       parts.push('', '## 当前', '')
       parts.push(`- workspace 项目：${projectOf(host)}`)
       parts.push(`- 上次场景：${state.scenario ?? '（无）'}`)

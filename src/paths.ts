@@ -1,8 +1,9 @@
 // paths — 数据根、两层作用域、项目标识
 //
-// 目录布局（文件即真相，没有索引、没有副本）：
+// 目录布局（文件即真相，没有索引、没有副本）。下面用 <数据根> 表示——默认是
+// ~/.mesync，适配层可以换成自己的目录名，用户也可以配置到任意位置：
 //
-//   ~/.dsh-mesync/
+//   <数据根>/
 //     mesync-use.md                 可覆盖的常驻文本
 //     meta/<五块>.md                心法（按需读）
 //     chain-judge.md                M4 的判断分支（按需读）
@@ -25,13 +26,31 @@ import { basename, join } from 'node:path'
 
 import type { LayerPaths, MemoryKind, RecordScope } from './types.js'
 
-/** 数据根：显式配置 > 环境变量 > ~/.dsh-mesync。 */
-export function resolveRoot(configured?: string): string {
-  const fromConfig = configured?.trim()
+/** 默认数据根目录名。用产品名，不用任何框架名。 */
+export const DEFAULT_DIR_NAME = '.mesync'
+
+export interface RootOptions {
+  /** 显式配置，优先级最高。 */
+  configured?: string
+  /**
+   * 缺省目录名（相对主目录）。适配层想沿用自己的目录名时传这个，
+   * 例如 dsh 传 '.dsh-mesync'，老用户的记忆就还在原处，一个文件都不用搬。
+   */
+  dirName?: string
+}
+
+/**
+ * 数据根：显式配置 > 环境变量 MESYNC_ROOT > 主目录下的默认目录。
+ *
+ * 这里是共享包，所以缺省值里不出现任何框架名。框架要自己的目录，由适配层传
+ * dirName；用户要换位置，配置 root 或设 MESYNC_ROOT 都行。
+ */
+export function resolveRoot(options: RootOptions = {}): string {
+  const fromConfig = options.configured?.trim()
   if (fromConfig) return fromConfig
   const fromEnv = process.env.MESYNC_ROOT?.trim()
   if (fromEnv) return fromEnv
-  return join(homedir(), '.dsh-mesync')
+  return join(homedir(), options.dirName?.trim() || DEFAULT_DIR_NAME)
 }
 
 /** 场景目录。 */
