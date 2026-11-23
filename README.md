@@ -18,7 +18,7 @@ dsh-mesync       DeepSeek Harness 的实现（存储、工具、注入）
 
 所以这里只留文本。存储、检索、注入这些**机制**留给各平台实现：机制可以不同，心法必须一致。
 
-代价要说清楚：**跨平台复用的是心法，不是实现。** 每个平台都要自己实现一遍存储布局与那几个工具；反过来，md 里写的路径（`meta/<kind>.md`、该层 `rules.md`）就成了实现必须遵守的规范。
+代价要说清楚：**跨平台复用的是心法，不是实现。** 每个平台都要自己实现一遍存储布局与那几个工具；反过来，md 里写的路径（`meta/<kind>.md`、该层 `AGENT.md`）就成了实现必须遵守的规范。
 
 ---
 
@@ -38,7 +38,7 @@ templates/
   scenarios/
     code/  design/  prd/
       scenario.md      场景卡：判据 / 产出 / 验收
-      AGENT.md         场景层工作说明
+      AGENT.md         场景层交付：做法 + 必须遵守的 + 工具
 docs/                  设计文档（架构、链、判断、五块心法、未决设计）
 ```
 
@@ -57,7 +57,7 @@ M5 记下走过的路径
 
 ### 五块心法的分工
 
-`chain-judge.md` 回答「记成哪一块」，五份心法只回答「这一块怎么写得对」。判据集中在链上，不散落在各份心法里。
+`chain-judge.md` 回答「放到哪里」（先问出口，再问记成哪一块），五份心法只回答「这一块怎么写得对」。判据集中在链上，不散落在各份心法里。
 
 ---
 
@@ -97,11 +97,11 @@ md 里点了名的工具，接入方要实现（名字别改，链上写的就�
 | 工具 | 干什么 |
 |---|---|
 | `mesync_context` | 列出场景（判据 / 产出 / 验收）、当前位置、记忆覆盖度 |
-| `scenario_load` | 交付该层 `AGENT.md`、`rules.md`、两层路径 |
+| `scenario_load` | 交付该层 `AGENT.md`（一份）、另一层的内容、交付层用量、写到哪里 |
 | `memory_write` | 写一条记忆（kind + scope） |
-| `memory_search` | 按关键词弱匹配检索 |
+| `memory_search` | 按关键词**查找**一条已知存在的记忆（不承担召回） |
 | `memory_read` | 按相对路径读任意 md（心法、链、记录） |
-| `doc_write` | 写层文档（`rules.md` / `AGENT.md` / 场景卡） |
+| `doc_write` | 写层交付文档（`AGENT.md` / 场景卡）；`AGENT.md` 有 2000 字符参考线，超了只提醒不拦截 |
 | `memory_discard` | 删一个文件（临时答案升格后清掉，或丢弃错答案） |
 | `path_record` | M5：追加一行走过的路径 |
 
@@ -114,12 +114,11 @@ md 里点了名的工具，接入方要实现（名字别改，链上写的就�
   mesync-use.md              可选：用户覆盖常驻正文
   meta/<kind>.md             可选：用户覆盖心法
   scenarios/<场景>/
-    rules.md                 场景层硬规则（M1 交付）
-    AGENT.md                 场景层工作说明
-    records/<kind>/          场景级记忆（所有项目通用）
+    AGENT.md                 场景层唯一的交付文件（做法 + 必须遵守的 + 工具）
+    records/<kind>/          场景级档案（所有项目通用）——只在被查找时读
     features/<项目>/
-      rules.md  AGENT.md
-      records/<kind>/        项目级记忆
+      AGENT.md               项目层唯一的交付文件
+      records/<kind>/        项目级档案
   _pending/                  临时区：问出来但还没被验证的答案
   _paths/                    走过的路径
 ```
