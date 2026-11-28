@@ -28,7 +28,7 @@ import { CHAIN_DOCS, META_NAMES } from './meta.js'
 import { layerPaths, legacyRulesFile, projectDir, projectId, scenarioLayerDir } from './paths.js'
 import { searchMemory } from './search.js'
 import { listScenarios, readScenario, scenarioLines } from './scenario.js'
-import { patchState, readState } from './state.js'
+import { patchStateFor, readStateFor } from './state.js'
 import type { MemoryKind, RecordScope } from './types.js'
 
 const KINDS: MemoryKind[] = ['cognition', 'decision', 'taste', 'correction', 'tool']
@@ -42,11 +42,13 @@ function assertSafeId(value: string, label: string): string {
   return id
 }
 
-/** 解析场景：显式参数 > 运行期状态；都没有就报错让 Agent 先判断。 */
-function resolveScenario(explicit: unknown, root: string): string {
+/** 解析场景：显式参数 > **本项目**的运行期状态；都没有就报错让 Agent 先判断。 */
+function resolveScenario(explicit: unknown, host: HostContext): string {
   const chosen = typeof explicit === 'string' ? explicit.trim() : ''
   if (chosen) return chosen
-  const remembered = readState(root).scenario
+
+  // 只认本项目的上次场景。拿别的项目的，等于把记忆写进错的场景层。
+  const remembered = readStateFor(host.root, projectOf(host)).scenario
   if (remembered) return remembered
   throw new Error(
     '还没有确定场景。先按「这次要产出什么」判断场景，再把 scenario 传进来（或先调 scenario_load）。',
@@ -136,7 +138,7 @@ export const TOOLS: readonly ToolSpec[] = [
     async run(args, host) {
       const { root } = host
       const cards = listScenarios(root)
-      const state = readState(root)
+      const state = readStateFor(root, projectOf(host))
       const only = typeof args.scenario === 'string' ? args.scenario.trim() : ''
       const coverage = formatCoverage(coverageAll(root, only || undefined))
 
@@ -187,7 +189,7 @@ export const TOOLS: readonly ToolSpec[] = [
         )
       }
 
-      patchState(root, { scenario, project: projectUsed })
+      patchStateFor(root, projectUsed, { scenario })
 
       const parts = [`## 场景 ${scenario}（${detail.card.name}）`, '']
       if (detail.card.description) parts.push(detail.card.description, '')
@@ -259,7 +261,7 @@ export const TOOLS: readonly ToolSpec[] = [
     },
     async run(args, host) {
       const { root } = host
-      const scenario = assertSafeId(resolveScenario(args.scenario, root), 'scenario')
+      const scenario = assertSafeId(resolveScenario(args.scenario, host), 'scenario')
       const projectUsed = projectArg(args, host)
 
       const kindRaw = String(args.kind ?? '').trim()
@@ -287,7 +289,7 @@ export const TOOLS: readonly ToolSpec[] = [
         title,
         content,
       })
-      patchState(root, { scenario, project: projectUsed })
+      patchStateFor(root, projectUsed, { scenario })
 
       if (kind === 'pending') {
         return `⏳ 已记入临时区 ${rel}\n\n这是「暂定」的答案：等产物被认可后升格为正式记忆，被否定就 memory_discard 掉。`
@@ -458,7 +460,7 @@ export const TOOLS: readonly ToolSpec[] = [
     },
     async run(args, host) {
       const { root } = host
-      const scenario = assertSafeId(resolveScenario(args.scenario, root), 'scenario')
+      const scenario = assertSafeId(resolveScenario(args.scenario, host), 'scenario')
       const projectUsed = projectArg(args, host)
       const line = typeof args.line === 'string' ? args.line.trim() : ''
       if (!line) throw new Error('line 不能为空')

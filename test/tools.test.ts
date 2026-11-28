@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import type { HostContext } from '../src/host.js'
-import { readState } from '../src/state.js'
+import { projectId } from '../src/paths.js'
+import { readStateFor } from '../src/state.js'
 import { findTool, TOOLS } from '../src/tools.js'
 
 interface Harness extends HostContext {
@@ -26,9 +27,14 @@ function harness(): Harness {
   }
 }
 
+/** 当前 harness 所属项目的运行期状态（状态是按项目分键的）。 */
+function stateOf(h: Harness) {
+  return readStateFor(h.root, projectId(h.cwd))
+}
+
 /** 写记忆前先把场景定下来（链上 M0/M1 的产物）。 */
 async function inCode(h: Harness, name: string, args: Record<string, unknown> = {}) {
-  if (!readState(h.root).scenario) await h.run('scenario_load', { scenario: 'code' })
+  if (!stateOf(h).scenario) await h.run('scenario_load', { scenario: 'code' })
   return h.run(name, args)
 }
 
@@ -99,7 +105,7 @@ describe('scenario_load', () => {
   it('把场景记进运行期状态', async () => {
     const h = harness()
     await h.run('scenario_load', { scenario: 'code' })
-    expect(readState(h.root).scenario).toBe('code')
+    expect(stateOf(h).scenario).toBe('code')
   })
 
   it('未知场景报错并给出可用清单', async () => {
@@ -130,6 +136,37 @@ describe('scenario_load', () => {
   })
 })
 
+// 这一组测的是**真会发生的损坏**：一个数据根被多个项目共用（现在还会被多个
+// 框架共用）时，A 定过的场景不该被 B 悄悄沿用——以前会安静地写进错的场景层。
+describe('共用数据根时场景不串', () => {
+  function sharedRoot(): { root: string; hostA: HostContext; hostB: HostContext } {
+    const root = mkdtempSync(join(tmpdir(), 'mesync-shared-'))
+    return {
+      root,
+      hostA: { root, cwd: mkdtempSync(join(tmpdir(), 'mesync-wsA-')) },
+      hostB: { root, cwd: mkdtempSync(join(tmpdir(), 'mesync-wsB-')) },
+    }
+  }
+
+  it('B 没定场景时明确报错，不拿 A 的', async () => {
+    const { hostA, hostB } = sharedRoot()
+    await findTool('scenario_load')!.run({ scenario: 'design' }, hostA)
+
+    await expect(
+      findTool('memory_write')!.run({ kind: 'cognition', title: 'B 的', content: 'x' }, hostB),
+    ).rejects.toThrow(/还没有确定场景/)
+  })
+
+  it('各自定过之后互不影响', async () => {
+    const { root, hostA, hostB } = sharedRoot()
+    await findTool('scenario_load')!.run({ scenario: 'design' }, hostA)
+    await findTool('scenario_load')!.run({ scenario: 'code' }, hostB)
+
+    expect(readStateFor(root, projectId(hostA.cwd)).scenario).toBe('design')
+    expect(readStateFor(root, projectId(hostB.cwd)).scenario).toBe('code')
+  })
+})
+
 describe('memory_write', () => {
   it('写项目级记录', async () => {
     const h = harness()
@@ -145,7 +182,7 @@ describe('memory_write', () => {
       'scenarios',
       'code',
       'features',
-      readState(h.root).project!,
+      projectId(h.cwd),
       'records',
       'cognition',
       '检索是子串匹配.md',
@@ -196,7 +233,7 @@ describe('memory_write', () => {
     const h = harness()
     await inCode(h, 'memory_write', { kind: 'cognition', title: '同名', content: '第一版' })
     await h.run('memory_write', { kind: 'cognition', title: '同名', content: '第二版' })
-    const dir = join(h.root, 'scenarios', 'code', 'features', readState(h.root).project!, 'records', 'cognition')
+    const dir = join(h.root, 'scenarios', 'code', 'features', projectId(h.cwd), 'records', 'cognition')
     expect(existsSync(join(dir, '同名.md'))).toBe(true)
     expect(existsSync(join(dir, '同名-2.md'))).toBe(true)
   })
@@ -330,7 +367,7 @@ describe('path_record', () => {
     const h = harness()
     await h.run('scenario_load', { scenario: 'code' })
     await h.run('path_record', { line: 'M0!→M1!→M2!→M3!→M4!→K! 记了一条认知' })
-    expect(readFileSync(join(h.root, '_paths', `code-${readState(h.root).project}.md`), 'utf8')).toContain(
+    expect(readFileSync(join(h.root, '_paths', `code-${projectId(h.cwd)}.md`), 'utf8')).toContain(
       'M0!→M1!→M2!→M3!→M4!→K!',
     )
   })

@@ -86,8 +86,20 @@ export interface Coverage {
 }
 
 /** 运行期状态：上一次识别出的场景与项目，供下一轮注入参考。 */
-export interface RuntimeState {
+export interface ProjectState {
   scenario?: string
-  project?: string
   updatedAt?: string
+}
+
+/**
+ * 运行期状态。
+ *
+ * **按项目分键。** 原先是一份扁平记录（scenario + project），多项目、多框架共用
+ * 同一个数据根时会把彼此的「上次场景」覆盖掉，然后**安静地**把记忆写进错的场景层
+ * ——不报错，只是记错地方，属于最难发现的那类损坏。
+ *
+ * 它不参与判断、也不是真相：判据始终是「这次产出什么」，这里只是省一次重复推断。
+ */
+export interface RuntimeState {
+  projects: Record<string, ProjectState>
 }

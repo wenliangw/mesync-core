@@ -14,7 +14,7 @@ import { coverageAll, formatCoverage } from './coverage.js'
 import type { HostContext } from './host.js'
 import { readUseDoc } from './meta.js'
 import { listScenarios, scenarioLines } from './scenario.js'
-import { readState } from './state.js'
+import { readStateFor } from './state.js'
 import type { ScenarioCard } from './types.js'
 
 /** 注入总长上限。 */
@@ -61,13 +61,13 @@ export function residentText(input: ResidentInput): ResidentResult {
 
   const use = (readUseDoc(root) ?? FALLBACK_USE).trim()
   const cards: ScenarioCard[] = listScenarios(root)
-  const state = readState(root)
+  const state = readStateFor(root, project ?? '')
   const dropped: string[] = []
 
   const stateLines: string[] = []
   if (project) stateLines.push(`- 当前 workspace 项目：${project}`)
   if (state.scenario) {
-    stateLines.push(`- 上次场景：${state.scenario}${state.project ? ` / ${state.project}` : ''}`)
+    stateLines.push(`- 上次场景：${state.scenario}`)
     stateLines.push('- 判据仍然是「这次产出什么」；产出变了就换场景，不必沿用。')
   }
 
